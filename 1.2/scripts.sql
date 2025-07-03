@@ -1,14 +1,7 @@
-CREATE OR REPLACE FUNCTION "DS".fill_account_turnover_f(i_OnDate DATE) RETURNS TABLE
-(on_date DATE,
-	account_rk NUMERIC, 
-	credit_amount NUMERIC(8,2),
-	credit_amount_rub NUMERIC(8,2),
-	debet_amount NUMERIC(8,2), 
-	debet_amount_rub NUMERIC(8,2)
-	) AS $$
-	#variable_conflict use_column
+CREATE OR REPLACE PROCEDURE "DS".fill_account_turnover_f2(i_OnDate DATE)
+LANGUAGE plpgsql AS $$
 BEGIN
-RETURN QUERY 
+INSERT INTO "DM".dm_account_turnover_f 
 	SELECT 
 		i_OnDate, 
 		ftb.account_rk, 
@@ -28,8 +21,7 @@ RETURN QUERY
 				OR mer.data_actual_end_date IS NULL
 			)
 		)
-	
 	GROUP BY on_date, account_rk
 	ORDER BY 2 NULLS FIRST;
 END;
-$$ LANGUAGE plpgsql
+$$ 
