@@ -25,3 +25,13 @@ INSERT INTO "DM".dm_account_turnover_f
 	ORDER BY 2 NULLS FIRST;
 END;
 $$ 
+;
+
+DO $$
+	DECLARE cnt DATE;
+BEGIN
+    FOR cnt IN SELECT generate_series('2018-01-01'::date, '2018-01-31'::date, '1 day')::date
+ LOOP
+	CALL "DS".fill_account_turnover_f2(cnt);
+    END LOOP;
+END; $$
