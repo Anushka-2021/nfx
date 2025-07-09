@@ -35,3 +35,80 @@ BEGIN
 	CALL "DS".fill_account_turnover_f2(cnt);
     END LOOP;
 END; $$
+
+
+
+
+CREATE OR REPLACE PROCEDURE "DS".fill_account_balance_f(i_OnDate DATE)
+LANGUAGE plpgsql AS $$
+BEGIN
+		(WITH
+			t_b AS (
+			SELECT DISTINCT 
+				fbf.on_date, 
+				fbf.account_rk, 
+				mad.char_type,
+				COALESCE(merd.reduced_cource, 1),
+				COALESCE(LAG(fbf.balance_out) OVER(
+					PARTITION BY fbf.account_rk 
+					ORDER BY fbf.on_date
+				), 0) AS balance_prev,
+				COALESCE(LAG(fbf.balance_out) OVER(
+					PARTITION BY fbf.account_rk 
+					ORDER BY fbf.on_date
+				), 0)*COALESCE(merd.reduced_cource, 1) AS balance_prev_rub
+			FROM "DS".ft_balance_f fbf
+			RIGHT JOIN "DS".md_account_d mad ON(
+				mad.account_rk = fbf.account_rk AND 
+				i_OnDate BETWEEN mad.data_actual_date
+					AND mad.data_actual_end_date+'1 day'::interval
+			)
+			LEFT JOIN "DS".md_exchange_rate_d merd ON(
+				merd.currency_rk = mad.currency_rk
+					AND (i_OnDate BETWEEN merd.data_actual_date
+						AND merd.data_actual_end_date)
+			)
+			GROUP BY fbf.account_rk, fbf.on_date, mad.char_type, merd.reduced_cource
+			ORDER BY fbf.account_rk, fbf.on_date
+		),
+		t_l AS (
+			SELECT on_date, account_rk,
+				credit_amount,
+				credit_amount_rub,
+				debet_amount,
+				debet_amount_rub
+			FROM "DM".dm_account_turnover_f
+		)
+	
+	INSERT INTO "DM".dm_account_balance_f 
+
+		SELECT t_b.on_date,
+				t_b.account_rk, 
+				CASE 
+					WHEN char_type = 'А' 
+						THEN balance_prev+COALESCE(debet_amount, 0)-COALESCE(credit_amount, 0)
+					ELSE balance_prev-COALESCE(debet_amount, 0)+COALESCE(credit_amount, 0)
+				END AS balance_out,
+				CASE 
+					WHEN char_type = 'А' 
+						THEN balance_prev_rub+COALESCE(debet_amount_rub, 0)-COALESCE(credit_amount_rub, 0)
+					ELSE balance_prev_rub-COALESCE(debet_amount_rub, 0)+COALESCE(credit_amount_rub, 0)
+				END AS balance_out_rub
+				
+			FROM t_b
+		LEFT JOIN t_l ON(
+			t_b.account_rk = t_l.account_rk
+				AND t_b.on_date = t_l.on_date
+		);
+END;
+$$ 
+;
+
+DO $$
+	DECLARE cnt DATE;
+BEGIN
+    FOR cnt IN SELECT generate_series('2018-01-01'::date, '2018-01-31'::date, '1 day')::date
+ LOOP
+	CALL "DS".fill_account_balance_f(cnt);
+    END LOOP;
+END; $$
