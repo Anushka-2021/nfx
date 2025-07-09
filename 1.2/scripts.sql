@@ -1,6 +1,21 @@
 CREATE OR REPLACE PROCEDURE "DS".fill_account_turnover_f2(i_OnDate DATE)
 LANGUAGE plpgsql AS $$
 BEGIN
+WITH log_id AS (INSERT INTO "LOGS".log_table (
+	start_timestamp, 
+	username, 
+	"database",
+	"action",
+	"table"
+	) VALUES (
+	NOW(),
+	current_user,
+	'nfx_cp1',
+	'insert',
+	'"DM".dm_account_turnover_f'
+	) RETURNING id)
+	
+DELETE FROM "DM".dm_account_turnover_f  WHERE on_date = i_OnDate;
 INSERT INTO "DM".dm_account_turnover_f 
 	SELECT 
 		i_OnDate, 
@@ -21,8 +36,9 @@ INSERT INTO "DM".dm_account_turnover_f
 				OR mer.data_actual_end_date IS NULL
 			)
 		)
-	GROUP BY on_date, account_rk
-	ORDER BY 2 NULLS FIRST;
+	GROUP BY on_date, account_rk;
+UPDATE "LOGS".log_table SET end_timestamp  = NOW, duration = NOW()-start_timestamp WHERE id = log_id;
+
 END;
 $$ 
 ;
@@ -38,25 +54,39 @@ END; $$
 
 
 
-
 CREATE OR REPLACE PROCEDURE "DS".fill_account_balance_f(i_OnDate DATE)
 LANGUAGE plpgsql AS $$
 BEGIN
-		(WITH
-			t_b AS (
+		
+WITH log_id AS (INSERT INTO "LOGS".log_table (
+	start_timestamp, 
+	username, 
+	"database",
+	"action",
+	"table"
+	) VALUES (
+	NOW(),
+	current_user,
+	'nfx_cp1',
+	'insert',
+	'"DM".dm_account_balance_f'
+	) RETURNING id),
+
+		t_b AS (
 			SELECT DISTINCT 
-				fbf.on_date, 
-				fbf.account_rk, 
-				mad.char_type,
-				COALESCE(merd.reduced_cource, 1),
-				COALESCE(LAG(fbf.balance_out) OVER(
-					PARTITION BY fbf.account_rk 
-					ORDER BY fbf.on_date
-				), 0) AS balance_prev,
-				COALESCE(LAG(fbf.balance_out) OVER(
-					PARTITION BY fbf.account_rk 
-					ORDER BY fbf.on_date
-				), 0)*COALESCE(merd.reduced_cource, 1) AS balance_prev_rub
+			fbf.on_date, 
+			fbf.account_rk, 
+			mad.char_type,
+			COALESCE(merd.reduced_cource, 1),
+			COALESCE(LAG(fbf.balance_out) OVER(
+				PARTITION BY fbf.account_rk 
+				ORDER BY fbf.on_date
+			), 0) AS balance_prev,
+			COALESCE(LAG(fbf.balance_out) OVER(
+				PARTITION BY fbf.account_rk 
+				ORDER BY fbf.on_date
+			), 0)*COALESCE(merd.reduced_cource, 1) AS balance_prev_rub
+		
 			FROM "DS".ft_balance_f fbf
 			RIGHT JOIN "DS".md_account_d mad ON(
 				mad.account_rk = fbf.account_rk AND 
@@ -79,8 +109,9 @@ BEGIN
 				debet_amount_rub
 			FROM "DM".dm_account_turnover_f
 		)
+	DELETE * FROM "DM".dm_account_balance_f WHERE on_date = i_onDate;
 	
-	INSERT INTO "DM".dm_account_balance_f 
+	INSERT INTO "DM".dm_account_balance_f (on_date, account_rk, balance_out, balance_out_rub)
 
 		SELECT t_b.on_date,
 				t_b.account_rk, 
@@ -95,11 +126,14 @@ BEGIN
 					ELSE balance_prev_rub-COALESCE(debet_amount_rub, 0)+COALESCE(credit_amount_rub, 0)
 				END AS balance_out_rub
 				
-			FROM t_b
+		FROM t_b
 		LEFT JOIN t_l ON(
 			t_b.account_rk = t_l.account_rk
 				AND t_b.on_date = t_l.on_date
 		);
+	
+UPDATE "LOGS".log_table SET end_timestamp  = NOW, duration = NOW()-start_timestamp WHERE id = log_id;
+
 END;
 $$ 
 ;
