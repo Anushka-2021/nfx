@@ -13,7 +13,7 @@ DECLARE @log_id INT (INSERT INTO "LOGS".log_table (
 	'nfx_cp1',
 	'insert',
 	'"DM".dm_account_turnover_f'
-	) RETURNING id)
+	) RETURNING id);
 	
 DELETE FROM "DM".dm_account_turnover_f  WHERE on_date = i_OnDate;
 INSERT INTO "DM".dm_account_turnover_f 
@@ -74,35 +74,36 @@ DECLARE @log_id Int (INSERT INTO "LOGS".log_table (
 
 DELETE FROM "DM".dm_account_balance_f WHERE on_date = i_onDate;
 
-WITH t_b AS (
-	SELECT DISTINCT 
-	fbf.on_date, 
-	fbf.account_rk, 
-	mad.char_type,
-	COALESCE(merd.reduced_cource, 1),
-	COALESCE(LAG(fbf.balance_out) OVER(
-		PARTITION BY fbf.account_rk 
-		ORDER BY fbf.on_date
-	), 0) AS balance_prev,
-	COALESCE(LAG(fbf.balance_out) OVER(
-		PARTITION BY fbf.account_rk 
-		ORDER BY fbf.on_date
-	), 0)*COALESCE(merd.reduced_cource, 1) AS balance_prev_rub
-		
-	FROM "DS".ft_balance_f fbf
-	RIGHT JOIN "DS".md_account_d mad ON(
-		mad.account_rk = fbf.account_rk AND 
-		i_OnDate BETWEEN mad.data_actual_date
-			AND mad.data_actual_end_date+'1 day'::interval
-	)
-	LEFT JOIN "DS".md_exchange_rate_d merd ON(
-		merd.currency_rk = mad.currency_rk
-			AND (i_OnDate BETWEEN merd.data_actual_date
-				AND merd.data_actual_end_date)
+WITH 
+	t_b AS (
+		SELECT DISTINCT 
+		fbf.on_date, 
+		fbf.account_rk, 
+		mad.char_type,
+		COALESCE(merd.reduced_cource, 1),
+		COALESCE(LAG(fbf.balance_out) OVER(
+			PARTITION BY fbf.account_rk 
+			ORDER BY fbf.on_date
+		), 0) AS balance_prev,
+		COALESCE(LAG(fbf.balance_out) OVER(
+			PARTITION BY fbf.account_rk 
+			ORDER BY fbf.on_date
+		), 0)*COALESCE(merd.reduced_cource, 1) AS balance_prev_rub
+			
+		FROM "DS".ft_balance_f fbf
+		RIGHT JOIN "DS".md_account_d mad ON(
+			mad.account_rk = fbf.account_rk AND 
+			i_OnDate BETWEEN mad.data_actual_date
+				AND mad.data_actual_end_date+'1 day'::interval
 		)
-	GROUP BY fbf.account_rk, fbf.on_date, mad.char_type, merd.reduced_cource
-	ORDER BY fbf.account_rk, fbf.on_date
-),
+		LEFT JOIN "DS".md_exchange_rate_d merd ON(
+			merd.currency_rk = mad.currency_rk
+				AND (i_OnDate BETWEEN merd.data_actual_date
+					AND merd.data_actual_end_date)
+			)
+		GROUP BY fbf.account_rk, fbf.on_date, mad.char_type, merd.reduced_cource
+		ORDER BY fbf.account_rk, fbf.on_date
+	),
 	t_l AS (
 		SELECT on_date, account_rk,
 			credit_amount,
