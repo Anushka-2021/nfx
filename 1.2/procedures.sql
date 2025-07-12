@@ -1,7 +1,7 @@
 CREATE OR REPLACE PROCEDURE "DS".fill_account_turnover_f2(i_OnDate DATE)
 LANGUAGE plpgsql AS $$
 BEGIN
-WITH log_id AS (INSERT INTO "LOGS".log_table (
+DECLARE @log_id INT (INSERT INTO "LOGS".log_table (
 	start_timestamp, 
 	username, 
 	"database",
@@ -37,7 +37,7 @@ INSERT INTO "DM".dm_account_turnover_f
 			)
 		)
 	GROUP BY on_date, account_rk;
-UPDATE "LOGS".log_table SET end_timestamp  = NOW, duration = NOW()-start_timestamp WHERE id = log_id;
+UPDATE "LOGS".log_table SET end_timestamp  = NOW, duration = NOW()-start_timestamp WHERE id = @log_id;
 
 END;
 $$ 
@@ -57,8 +57,8 @@ END; $$
 CREATE OR REPLACE PROCEDURE "DS".fill_account_balance_f(i_OnDate DATE)
 LANGUAGE plpgsql AS $$
 BEGIN
-		
-WITH log_id AS (INSERT INTO "LOGS".log_table (
+
+DECLARE @log_id Int (INSERT INTO "LOGS".log_table (
 	start_timestamp, 
 	username, 
 	"database",
@@ -70,46 +70,47 @@ WITH log_id AS (INSERT INTO "LOGS".log_table (
 	'nfx_cp1',
 	'insert',
 	'"DM".dm_account_balance_f'
-	) RETURNING id),
+	) RETURNING id);
 
-		t_b AS (
-			SELECT DISTINCT 
-			fbf.on_date, 
-			fbf.account_rk, 
-			mad.char_type,
-			COALESCE(merd.reduced_cource, 1),
-			COALESCE(LAG(fbf.balance_out) OVER(
-				PARTITION BY fbf.account_rk 
-				ORDER BY fbf.on_date
-			), 0) AS balance_prev,
-			COALESCE(LAG(fbf.balance_out) OVER(
-				PARTITION BY fbf.account_rk 
-				ORDER BY fbf.on_date
-			), 0)*COALESCE(merd.reduced_cource, 1) AS balance_prev_rub
+DELETE FROM "DM".dm_account_balance_f WHERE on_date = i_onDate;
+
+WITH t_b AS (
+	SELECT DISTINCT 
+	fbf.on_date, 
+	fbf.account_rk, 
+	mad.char_type,
+	COALESCE(merd.reduced_cource, 1),
+	COALESCE(LAG(fbf.balance_out) OVER(
+		PARTITION BY fbf.account_rk 
+		ORDER BY fbf.on_date
+	), 0) AS balance_prev,
+	COALESCE(LAG(fbf.balance_out) OVER(
+		PARTITION BY fbf.account_rk 
+		ORDER BY fbf.on_date
+	), 0)*COALESCE(merd.reduced_cource, 1) AS balance_prev_rub
 		
-			FROM "DS".ft_balance_f fbf
-			RIGHT JOIN "DS".md_account_d mad ON(
-				mad.account_rk = fbf.account_rk AND 
-				i_OnDate BETWEEN mad.data_actual_date
-					AND mad.data_actual_end_date+'1 day'::interval
-			)
-			LEFT JOIN "DS".md_exchange_rate_d merd ON(
-				merd.currency_rk = mad.currency_rk
-					AND (i_OnDate BETWEEN merd.data_actual_date
-						AND merd.data_actual_end_date)
-			)
-			GROUP BY fbf.account_rk, fbf.on_date, mad.char_type, merd.reduced_cource
-			ORDER BY fbf.account_rk, fbf.on_date
-		),
-		t_l AS (
-			SELECT on_date, account_rk,
-				credit_amount,
-				credit_amount_rub,
-				debet_amount,
-				debet_amount_rub
-			FROM "DM".dm_account_turnover_f
+	FROM "DS".ft_balance_f fbf
+	RIGHT JOIN "DS".md_account_d mad ON(
+		mad.account_rk = fbf.account_rk AND 
+		i_OnDate BETWEEN mad.data_actual_date
+			AND mad.data_actual_end_date+'1 day'::interval
+	)
+	LEFT JOIN "DS".md_exchange_rate_d merd ON(
+		merd.currency_rk = mad.currency_rk
+			AND (i_OnDate BETWEEN merd.data_actual_date
+				AND merd.data_actual_end_date)
 		)
-	DELETE * FROM "DM".dm_account_balance_f WHERE on_date = i_onDate;
+	GROUP BY fbf.account_rk, fbf.on_date, mad.char_type, merd.reduced_cource
+	ORDER BY fbf.account_rk, fbf.on_date
+),
+	t_l AS (
+		SELECT on_date, account_rk,
+			credit_amount,
+			credit_amount_rub,
+			debet_amount,
+			debet_amount_rub
+		FROM "DM".dm_account_turnover_f
+	)
 	
 	INSERT INTO "DM".dm_account_balance_f (on_date, account_rk, balance_out, balance_out_rub)
 
@@ -132,7 +133,7 @@ WITH log_id AS (INSERT INTO "LOGS".log_table (
 				AND t_b.on_date = t_l.on_date
 		);
 	
-UPDATE "LOGS".log_table SET end_timestamp  = NOW, duration = NOW()-start_timestamp WHERE id = log_id;
+UPDATE "LOGS".log_table SET end_timestamp  = NOW, duration = NOW()-start_timestamp WHERE id = @log_id;
 
 END;
 $$ 
