@@ -1,4 +1,4 @@
-CREATE OR REPLACE PROCEDURE "DS".fill_account_turnover_f2(i_OnDate DATE)
+CREATE OR REPLACE PROCEDURE "DS".fill_account_turnover_f(i_OnDate DATE)
 LANGUAGE plpgsql AS $$
 BEGIN
 DECLARE @log_id INT (INSERT INTO "LOGS".log_table (
