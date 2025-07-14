@@ -48,7 +48,7 @@ DO $$
 BEGIN
     FOR cnt IN SELECT generate_series('2018-01-01'::date, '2018-01-31'::date, '1 day')::date
  LOOP
-	CALL "DS".fill_account_turnover_f2(cnt);
+	CALL "DS".fill_account_turnover_f(cnt);
     END LOOP;
 END; $$
 
