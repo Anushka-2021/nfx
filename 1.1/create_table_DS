@@ -1,0 +1,75 @@
+CREATE SCHEMA "DS";
+
+CREATE TABLE IF NOT EXISTS "DS".ft_posting_f
+(
+    oper_date date NOT NULL,
+    credit_account_rk numeric NOT NULL,
+    debet_account_rk numeric NOT NULL,
+    credit_amount double precision,
+    debet_amount double precision
+);
+
+CREATE TABLE IF NOT EXISTS "DS".md_account_d
+(
+    data_actual_date date NOT NULL,
+    data_actual_end_date date NOT NULL,
+    account_rk numeric NOT NULL,
+    account_number character varying(20) COLLATE pg_catalog."default" NOT NULL,
+    char_type character varying(1) COLLATE pg_catalog."default" NOT NULL,
+    currency_rk numeric NOT NULL,
+    currency_code character varying(3) COLLATE pg_catalog."default" NOT NULL,
+    CONSTRAINT md_account_d_pkey PRIMARY KEY (data_actual_date, account_rk)
+);
+
+CREATE TABLE IF NOT EXISTS "DS".md_currency_d
+(
+    currency_rk numeric NOT NULL,
+    data_actual_date date NOT NULL,
+    data_actual_end_date date,
+    currency_code character varying(3) COLLATE pg_catalog."default",
+    code_iso_char character varying(3) COLLATE pg_catalog."default",
+    CONSTRAINT md_currency_d_pkey PRIMARY KEY (currency_rk, data_actual_date)
+);
+
+CREATE TABLE IF NOT EXISTS "DS".md_exchange_rate_d
+(
+    data_actual_date date NOT NULL,
+    data_actual_end_date date,
+    currency_rk numeric NOT NULL,
+    reduced_cource double precision,
+    code_iso_num character varying(3) COLLATE pg_catalog."default",
+    CONSTRAINT md_exchange_rate_d_pkey PRIMARY KEY (data_actual_date, currency_rk)
+);
+
+CREATE TABLE IF NOT EXISTS "DS".md_ledger_account_s
+(
+    chapter character(1) COLLATE pg_catalog."default",
+    chapter_name character varying(16) COLLATE pg_catalog."default",
+    section_number integer,
+    section_name character varying(22) COLLATE pg_catalog."default",
+    subsection_name character varying(21) COLLATE pg_catalog."default",
+    ledger1_account integer,
+    ledger1_account_name character varying(47) COLLATE pg_catalog."default",
+    ledger_account integer NOT NULL,
+    ledger_account_name character varying(153) COLLATE pg_catalog."default",
+    characteristic character(1) COLLATE pg_catalog."default",
+    is_resident integer,
+    is_reserve integer,
+    is_reserved integer,
+    is_loan integer,
+    is_reserved_assets integer,
+    is_overdue integer,
+    is_interest integer,
+    pair_account character varying(5) COLLATE pg_catalog."default",
+    start_date date NOT NULL,
+    end_date date,
+    is_rub_only integer,
+    main_term character varying(1) COLLATE pg_catalog."default",
+    main_term_measure character varying(1) COLLATE pg_catalog."default",
+    max_term character varying(1) COLLATE pg_catalog."default",
+    max_term_measure character varying(1) COLLATE pg_catalog."default",
+    ledger_acc_full_name_transmit character varying(1) COLLATE pg_catalog."default",
+    is_revaluation character varying(1) COLLATE pg_catalog."default",
+    is_correct character varying(1) COLLATE pg_catalog."default",
+    CONSTRAINT md_ledger_account_s_pkey PRIMARY KEY (ledger_account, start_date)
+);
