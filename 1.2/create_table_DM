@@ -9,6 +9,14 @@ CREATE TABLE IF NOT EXISTS "DM".DM_ACCOUNT_TURNOVER_F (
 	debet_amount_rub NUMERIC(23,8)
 );
 
+CREATE TABLE IF NOT EXISTS "DM".dm_account_balance_f
+(
+    on_date date,
+    account_rk numeric,
+    balance_out numeric(23,8),
+    balance_out_rub  numeric(23,8)
+);
+
 CREATE TABLE IF NOT EXISTS "DM".DM_F101_ROUND_F (
 	from_date DATE,
 	to_date DATE,
