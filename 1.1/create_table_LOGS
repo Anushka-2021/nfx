@@ -1,0 +1,15 @@
+CREATE SCHEMA "LOGS";
+
+CREATE TABLE IF NOT EXISTS "LOGS".log_table
+(
+    id integer NOT NULL DEFAULT nextval('"LOGS".log_table_id_seq'::regclass),
+    start_timestamp timestamp with time zone,
+    username character varying COLLATE pg_catalog."default",
+    query_text text COLLATE pg_catalog."default",
+    duration interval,
+    database character varying COLLATE pg_catalog."default",
+    action character varying COLLATE pg_catalog."default",
+    "table" character varying COLLATE pg_catalog."default",
+    end_timestamp time with time zone,
+    CONSTRAINT log_table_pkey PRIMARY KEY (id)
+);
