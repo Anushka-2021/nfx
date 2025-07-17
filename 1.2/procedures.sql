@@ -5,8 +5,7 @@
 CREATE OR REPLACE PROCEDURE "DS".fill_account_turnover_f(
 	IN i_ondate date)
 LANGUAGE 'plpgsql'
-AS $BODY$
-
+AS $$
 
 DECLARE log_id INT;
 	
@@ -56,7 +55,7 @@ INSERT INTO "DM".dm_account_turnover_f
 UPDATE "LOGS".log_table SET end_timestamp  = NOW(), duration = NOW()-start_timestamp WHERE id = log_id;
 
 END;
-$BODY$;
+$$;
 
 
 
@@ -70,12 +69,16 @@ BEGIN
 END; $$
 
 
+------------------------------------------------------------------
 
 CREATE OR REPLACE PROCEDURE "DS".fill_account_balance_f(i_OnDate DATE)
 LANGUAGE plpgsql AS $$
-BEGIN
 
-DECLARE @log_id Int (INSERT INTO "LOGS".log_table (
+DECLARE log_id INT; 
+
+BEGIN 
+DELETE FROM "DM".dm_account_balance_f WHERE on_date = i_onDate;
+INSERT INTO "LOGS".log_table (
 	start_timestamp, 
 	username, 
 	"database",
@@ -87,9 +90,7 @@ DECLARE @log_id Int (INSERT INTO "LOGS".log_table (
 	'nfx_cp1',
 	'insert',
 	'"DM".dm_account_balance_f'
-	) RETURNING id);
-
-DELETE FROM "DM".dm_account_balance_f WHERE on_date = i_onDate;
+	) RETURNING id INTO log_id;
 
 WITH 
 	t_b AS (
@@ -154,8 +155,8 @@ WITH
 UPDATE "LOGS".log_table SET end_timestamp  = NOW, duration = NOW()-start_timestamp WHERE id = @log_id;
 
 END;
-$$ 
-;
+$$;
+
 
 DO $$
 	DECLARE cnt DATE;
