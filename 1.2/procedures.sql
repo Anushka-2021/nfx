@@ -152,7 +152,7 @@ WITH
 				AND t_b.on_date = t_l.on_date
 		);
 	
-UPDATE "LOGS".log_table SET end_timestamp  = NOW, duration = NOW()-start_timestamp WHERE id = @log_id;
+UPDATE "LOGS".log_table SET end_timestamp  = NOW(), duration = NOW()-start_timestamp WHERE id = @log_id;
 
 END;
 $$;
