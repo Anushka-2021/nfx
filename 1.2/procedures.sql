@@ -1,7 +1,20 @@
-CREATE OR REPLACE PROCEDURE "DS".fill_account_turnover_f(i_OnDate DATE)
-LANGUAGE plpgsql AS $$
+-- PROCEDURE: DS.fill_account_turnover_f(date)
+
+-- DROP PROCEDURE IF EXISTS "DS".fill_account_turnover_f(date);
+
+CREATE OR REPLACE PROCEDURE "DS".fill_account_turnover_f(
+	IN i_ondate date)
+LANGUAGE 'plpgsql'
+AS $BODY$
+
+
+DECLARE log_id INT;
+	
 BEGIN
-DECLARE @log_id INT (INSERT INTO "LOGS".log_table (
+
+DELETE FROM "DM".dm_account_turnover_f  WHERE on_date = i_OnDate; 
+
+INSERT INTO "LOGS".log_table (
 	start_timestamp, 
 	username, 
 	"database",
@@ -13,17 +26,18 @@ DECLARE @log_id INT (INSERT INTO "LOGS".log_table (
 	'nfx_cp1',
 	'insert',
 	'"DM".dm_account_turnover_f'
-	) RETURNING id);
-	
-DELETE FROM "DM".dm_account_turnover_f  WHERE on_date = i_OnDate;
+	) RETURNING id INTO log_id;
+
 INSERT INTO "DM".dm_account_turnover_f 
 	SELECT 
 		i_OnDate, 
 		ftb.account_rk, 
 		SUM(COALESCE(ftp_c.credit_amount, 0))::numeric AS credit_amount, 
-		SUM(COALESCE(ftp_c.credit_amount, 0)*COALESCE(mer.reduced_cource, 1))::numeric AS credit_amount_rub,
+		SUM(COALESCE(ftp_c.credit_amount, 0)*COALESCE(mer.reduced_cource, 1))::numeric 
+			AS credit_amount_rub,
 		SUM(COALESCE(ftp_d.debet_amount, 0))::numeric AS debet_amount, 
-		SUM(COALESCE(ftp_d.debet_amount, 0)*COALESCE(mer.reduced_cource, 1))::numeric AS debet_amount_rub
+		SUM(COALESCE(ftp_d.debet_amount, 0)*COALESCE(mer.reduced_cource, 1))::numeric 
+			AS debet_amount_rub
 		
 	FROM "DS".ft_balance_f ftb
 	LEFT JOIN "DS".ft_posting_f ftp_c ON(ftb.account_rk = ftp_c.credit_account_rk)
@@ -36,12 +50,15 @@ INSERT INTO "DM".dm_account_turnover_f
 				OR mer.data_actual_end_date IS NULL
 			)
 		)
-	GROUP BY on_date, account_rk;
-UPDATE "LOGS".log_table SET end_timestamp  = NOW, duration = NOW()-start_timestamp WHERE id = @log_id;
+	GROUP BY on_date, account_rk
+	LIMIT 5;
+
+UPDATE "LOGS".log_table SET end_timestamp  = NOW(), duration = NOW()-start_timestamp WHERE id = log_id;
 
 END;
-$$ 
-;
+$BODY$;
+
+
 
 DO $$
 	DECLARE cnt DATE;
