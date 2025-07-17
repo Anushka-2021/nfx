@@ -71,8 +71,13 @@ END; $$
 
 ------------------------------------------------------------------
 
-CREATE OR REPLACE PROCEDURE "DS".fill_account_balance_f(i_OnDate DATE)
-LANGUAGE plpgsql AS $$
+-- PROCEDURE: DS.fill_account_balance_f(date)
+
+-- DROP PROCEDURE IF EXISTS "DS".fill_account_balance_f(date);
+
+CREATE OR REPLACE PROCEDURE "DS".fill_account_balance_f(
+	IN i_ondate date) LANGUAGE 'plpgsql' 
+AS $$
 
 DECLARE log_id INT; 
 
@@ -94,69 +99,53 @@ INSERT INTO "LOGS".log_table (
 
 WITH 
 	t_b AS (
-		SELECT DISTINCT 
-		fbf.on_date, 
-		fbf.account_rk, 
-		mad.char_type,
-		COALESCE(merd.reduced_cource, 1),
-		COALESCE(LAG(fbf.balance_out) OVER(
-			PARTITION BY fbf.account_rk 
-			ORDER BY fbf.on_date
-		), 0) AS balance_prev,
-		COALESCE(LAG(fbf.balance_out) OVER(
-			PARTITION BY fbf.account_rk 
-			ORDER BY fbf.on_date
-		), 0)*COALESCE(merd.reduced_cource, 1) AS balance_prev_rub
+		SELECT  
+			i_OnDate AS on_date,
+			dabf.account_rk, 
+			ROUND(COALESCE(dabf.balance_out, 0), 2) AS balance_out,
+			ROUND(COALESCE(dabf.balance_out_rub, 0), 2) AS balance_out_rub, 
+			mad.char_type
 			
-		FROM "DS".ft_balance_f fbf
+		FROM "DM".dm_account_balance_f dabf
 		RIGHT JOIN "DS".md_account_d mad ON(
-			mad.account_rk = fbf.account_rk AND 
+			mad.account_rk = dabf.account_rk AND 
 			i_OnDate BETWEEN mad.data_actual_date
 				AND mad.data_actual_end_date+'1 day'::interval
 		)
-		LEFT JOIN "DS".md_exchange_rate_d merd ON(
-			merd.currency_rk = mad.currency_rk
-				AND (i_OnDate BETWEEN merd.data_actual_date
-					AND merd.data_actual_end_date)
-			)
-		GROUP BY fbf.account_rk, fbf.on_date, mad.char_type, merd.reduced_cource
-		ORDER BY fbf.account_rk, fbf.on_date
+		WHERE dabf.on_date = i_OnDate::date - '1 day'::interval
 	),
-	t_l AS (
-		SELECT on_date, account_rk,
-			credit_amount,
-			credit_amount_rub,
-			debet_amount,
-			debet_amount_rub
+	t_t AS (SELECT on_date, account_rk,
+			ROUND(credit_amount, 2) AS credit_amount,
+			ROUND(credit_amount_rub, 2) AS credit_amount_rub,
+			ROUND(debet_amount, 2) AS debet_amount,
+			ROUND(debet_amount_rub, 2) AS debet_amount_rub
 		FROM "DM".dm_account_turnover_f
+	WHERE on_date = i_OnDate
 	)
 	
-	INSERT INTO "DM".dm_account_balance_f (on_date, account_rk, balance_out, balance_out_rub)
+INSERT INTO "DM".dm_account_balance_f (on_date, account_rk, balance_out, balance_out_rub)
 
-		SELECT t_b.on_date,
-				t_b.account_rk, 
-				CASE 
-					WHEN char_type = 'А' 
-						THEN balance_prev+COALESCE(debet_amount, 0)-COALESCE(credit_amount, 0)
-					ELSE balance_prev-COALESCE(debet_amount, 0)+COALESCE(credit_amount, 0)
-				END AS balance_out,
-				CASE 
-					WHEN char_type = 'А' 
-						THEN balance_prev_rub+COALESCE(debet_amount_rub, 0)-COALESCE(credit_amount_rub, 0)
-					ELSE balance_prev_rub-COALESCE(debet_amount_rub, 0)+COALESCE(credit_amount_rub, 0)
-				END AS balance_out_rub
-				
+	SELECT
+		t_b.on_date, 
+		t_b.account_rk,
+		CASE 
+			WHEN t_b.char_type = 'А' 
+				THEN t_b.balance_out+COALESCE(debet_amount, 0)-COALESCE(credit_amount, 0)
+			ELSE t_b.balance_out-COALESCE(debet_amount, 0)+COALESCE(credit_amount, 0)
+		END AS balance_out,
+	CASE 
+		WHEN char_type = 'А' 
+			THEN t_b.balance_out_rub+COALESCE(debet_amount_rub, 0)-COALESCE(credit_amount_rub, 0)
+		ELSE t_b.balance_out_rub-COALESCE(debet_amount_rub, 0)+COALESCE(credit_amount_rub, 0)
+	END AS balance_out_rub
+	
 		FROM t_b
-		LEFT JOIN t_l ON(
-			t_b.account_rk = t_l.account_rk
-				AND t_b.on_date = t_l.on_date
-		);
+		LEFT JOIN t_t USING(account_rk);
 	
 UPDATE "LOGS".log_table SET end_timestamp  = NOW(), duration = NOW()-start_timestamp WHERE id = @log_id;
 
 END;
 $$;
-
 
 DO $$
 	DECLARE cnt DATE;
