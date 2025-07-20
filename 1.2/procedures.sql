@@ -49,8 +49,7 @@ INSERT INTO "DM".dm_account_turnover_f
 				OR mer.data_actual_end_date IS NULL
 			)
 		)
-	GROUP BY on_date, account_rk
-	LIMIT 5;
+	GROUP BY on_date, account_rk;
 
 UPDATE "LOGS".log_table SET end_timestamp  = NOW(), duration = NOW()-start_timestamp WHERE id = log_id;
 
