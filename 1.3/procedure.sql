@@ -105,13 +105,10 @@ INSERT INTO "DM".dm_f101_round_f
 	SUM(balance_out_val), 
 	SUM(balance_out_total)
 	FROM t1
-	GROUP BY i_from_date, i_to_date, chapter, ledger_account, characteristic
+	GROUP BY t1.i_from_date, t1.i_to_date, chapter, ledger_account, characteristic
 	;
 
 UPDATE "LOGS".log_table SET end_timestamp  = NOW(), duration = NOW()-start_timestamp WHERE id = log_id;
 
 END;
 $BODY$;
-
-
-CALL "DM".fill_f101_round_f('2018-02-01');
