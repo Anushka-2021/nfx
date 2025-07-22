@@ -1,7 +1,7 @@
 CREATE OR REPLACE PROCEDURE "DM".fill_f101_round_f(
 	IN i_ondate date)
 LANGUAGE 'plpgsql'
-AS $$
+AS $BODY$
 
 DECLARE log_id INT;
 	i_from_date DATE = i_OnDate - '1 month'::interval;
@@ -26,8 +26,8 @@ INSERT INTO "LOGS".log_table (
 	'"DM".dm_f101_round_f'
 	) RETURNING id INTO log_id;
 
-INSERT INTO "DM".dm_f101_round_f 
-	SELECT 
+WITH t1 AS 
+	(SELECT 
 		i_from_date,
 		i_to_date,
 		mlas.chapter,
@@ -88,10 +88,30 @@ INSERT INTO "DM".dm_f101_round_f
 	GROUP BY mlas.chapter,
 		mlas.ledger_account,
 		account_number,
-		mad.char_type, mad.currency_code, mad.account_rk
+		mad.char_type, mad.currency_code, mad.account_rk)
+	
+INSERT INTO "DM".dm_f101_round_f 
+	SELECT t1.i_from_date, t1.i_to_date, chapter, ledger_account, characteristic,
+	SUM(balance_in_rub), 
+	SUM(balance_in_val), 
+	SUM(balance_in_total), 
+	SUM(turn_deb_rub), 
+	SUM(turn_deb_val), 
+	SUM(turn_deb_total), 
+	SUM(turn_cre_rub), 
+	SUM(turn_cre_val), 
+	SUM(turn_cre_total), 
+	SUM(balance_out_rub), 
+	SUM(balance_out_val), 
+	SUM(balance_out_total)
+	FROM t1
+	GROUP BY i_from_date, i_to_date, chapter, ledger_account, characteristic
 	;
 
 UPDATE "LOGS".log_table SET end_timestamp  = NOW(), duration = NOW()-start_timestamp WHERE id = log_id;
 
 END;
-$$;
+$BODY$;
+
+
+CALL "DM".fill_f101_round_f('2018-02-01');
